@@ -32,6 +32,9 @@ class HTTPResponse(object):
         self.code = code
         self.body = body
 
+    def __str__(self):
+        return "Code: 200" + '\nBody: \n' + self.body
+
 class HTTPClient(object):
     #def get_host_port(self,url):
 
@@ -41,14 +44,15 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        code = int(data.split(' ')[1])
+        return code if code else 400
 
     def get_headers(self,data):
         return None
 
     def get_body(self, data):
-        return None
-    
+        return data.split('\r\n\r\n')[1] if len(data.split('\r\n\r\n')) > 1 else ''
+
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
         
@@ -67,14 +71,54 @@ class HTTPClient(object):
                 done = not part
         return buffer.decode('utf-8')
 
+    def populate_info(self, url):
+        urlInfo = {}
+        parsedUrl = urllib.parse.urlparse(url)
+        urlInfo["path"] = parsedUrl.path if parsedUrl.path else "/"
+        urlInfo["hostname"] = parsedUrl.hostname if parsedUrl.hostname else "/"
+        urlInfo["port"] = parsedUrl.port if parsedUrl.port else 80
+
+        return urlInfo
+
     def GET(self, url, args=None):
-        code = 500
-        body = ""
+        urlInfo = self.populate_info(url)
+        self.connect(urlInfo["hostname"], urlInfo["port"])
+        self.sendall(
+            f'GET {urlInfo["path"]} HTTP/1.0\r\nHost: {urlInfo["hostname"]}:{urlInfo["port"]}\r\nConnection: Close\r\n\r\n'
+        )
+        data = self.recvall(self.socket)
+        self.close()
+
+        code = self.get_code(data)
+        body = self.get_body(data)
+
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        urlInfo = self.populate_info(url)
+        self.connect(urlInfo["hostname"], urlInfo["port"])
+        baseRequest = f'POST {urlInfo["path"]} HTTP/1.0\r\nHost: {urlInfo["hostname"]}:{urlInfo["port"]}\r\nConnection: Close\r\n'
+
+        if args == None:
+            self.sendall(
+                baseRequest + 'Content-Length: 0\r\n\r\n'
+            )
+        else:
+            queryParameters = ""
+
+            for key in args:
+                value = args[key]
+                queryParameters += key + "=" + value + "&"
+            queryParameters = queryParameters[:-1]
+            self.sendall(
+                baseRequest + 'Content-Type: application/x-www-form-urlencoded\r\nContent-Length: ' 
+                + str(len(queryParameters.encode("utf-8"))) + '\r\n\r\n' + queryParameters + '\r\n\r\n'
+            )
+        data = self.recvall(self.socket)
+        self.close()
+
+        code = self.get_code(data)
+        body = self.get_body(data)
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
