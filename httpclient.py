@@ -48,7 +48,15 @@ class HTTPClient(object):
         return code if code else 400
 
     def get_headers(self,data):
-        return None
+        dataNoBody = data.split('\r\n\r\n')[0]
+        dataLines = dataNoBody.split('\r\n')
+        headers = ""
+        i = 1
+        while i < len(dataLines):
+            if dataLines[i] != "":
+                headers += dataLines[i] + '\r\n'
+            i += 1
+        return headers
 
     def get_body(self, data):
         return data.split('\r\n\r\n')[1] if len(data.split('\r\n\r\n')) > 1 else ''
@@ -117,6 +125,7 @@ class HTTPClient(object):
         data = self.recvall(self.socket)
         self.close()
 
+        headers = self.get_headers(data)
         code = self.get_code(data)
         body = self.get_body(data)
         return HTTPResponse(code, body)
