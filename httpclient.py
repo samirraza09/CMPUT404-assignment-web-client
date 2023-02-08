@@ -33,7 +33,7 @@ class HTTPResponse(object):
         self.body = body
 
     def __str__(self):
-        return "Code: 200" + '\nBody: \n' + self.body
+        return "Code: " + str(self.code) + '\nBody: \n' + self.body
 
 class HTTPClient(object):
     #def get_host_port(self,url):
